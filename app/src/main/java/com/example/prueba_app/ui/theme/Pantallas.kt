@@ -43,14 +43,15 @@ import com.example.prueba_app.model.DetalleCarrito
 import com.example.prueba_app.model.Plato
 import com.example.prueba_app.model.Usuario
 import com.example.prueba_app.viewmodel.ComidaViewModel
+import com.example.prueba_app.ui.theme.camara.PantallaCamara
 
-//UTILIDAD PARA FORMATEAR A CLP
+// Utilidad para moneda CLP
 fun formatoCLP(monto: Int): String {
     val format = NumberFormat.getCurrencyInstance(Locale("es", "CL"))
     return format.format(monto)
 }
 
-//COMPONENTE: TOP BAR CON MENU
+// Barra Superior con Menú
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BarraSuperior(onExit: () -> Unit) {
@@ -92,7 +93,7 @@ fun BarraSuperior(onExit: () -> Unit) {
     )
 }
 
-//PANTALLA PRINCIPAL (Scaffold con Navegación)
+// Pantalla Principal (Scaffold con Navegación)
 @Composable
 fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
     val navController = rememberNavController()
@@ -100,27 +101,36 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
     val currentRoute = navBackStackEntry?.destination?.route
     val cantidadCarrito by viewModel.cantidadProductos.collectAsState()
 
+    // Estado de visibilidad del buscador
+    val esBuscadorVisible by viewModel.buscadorVisible.collectAsState()
+
     Scaffold(
         bottomBar = {
             if (currentRoute != "splash") {
                 NavigationBar {
+                    // 1. BUSCAR
                     NavigationBarItem(
                         icon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
                         label = { Text("Buscar") },
-                        selected = currentRoute == "home",
+                        // Seleccionado solo si estamos en home Y el buscador es visible
+                        selected = currentRoute == "home" && esBuscadorVisible,
                         onClick = {
-                            if (currentRoute != "home") {
+                            if (currentRoute == "home") {
+                                // Si ya estamos en home, alternamos (mostrar/esconder)
+                                viewModel.toggleBuscador()
+                            } else {
+                                // Si venimos de otra pantalla, vamos a home y forzamos mostrar
                                 viewModel.mostrarBuscador(true)
                                 navController.navigate("home") {
                                     popUpTo("home") { saveState = true }
                                     launchSingleTop = true
                                     restoreState = true
                                 }
-                            } else {
-                                viewModel.toggleBuscador()
                             }
                         }
                     )
+
+                    // 2. CARRITO
                     NavigationBarItem(
                         icon = {
                             BadgedBox(badge = {
@@ -141,6 +151,42 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
                             }
                         }
                     )
+
+                    // 3. MENÚ (Oculta buscador)
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.RestaurantMenu, contentDescription = "Menú") },
+                        label = { Text("Menú") },
+                        selected = currentRoute == "home" && !esBuscadorVisible,
+                        onClick = {
+                            // Ocultamos el buscador para ver solo la lista
+                            viewModel.mostrarBuscador(false)
+                            if (currentRoute != "home") {
+                                navController.navigate("home") {
+                                    popUpTo("home") { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        }
+                    )
+
+                    // 4. CÁMARA
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.CameraAlt, contentDescription = "Cámara") },
+                        label = { Text("Cámara") },
+                        selected = currentRoute == "camara",
+                        onClick = {
+                            if (currentRoute != "camara") {
+                                navController.navigate("camara") {
+                                    popUpTo("home") { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        }
+                    )
+
+                    // 5. USUARIO
                     NavigationBarItem(
                         icon = { Icon(Icons.Default.Person, contentDescription = "Usuario") },
                         label = { Text("Usuario") },
@@ -176,7 +222,6 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
                 })
             }
             composable("home") {
-
                 PantallaListaPlatos(viewModel, onExit = onExitApp) { platoId ->
                     navController.navigate("detalle/$platoId")
                 }
@@ -187,6 +232,13 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
             }
             composable("carrito") {
                 PantallaCarrito(viewModel)
+            }
+            composable("camara") {
+                PantallaCamara(onExit = {
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = true }
+                    }
+                })
             }
             composable("usuario") {
                 PantallaUsuario(viewModel)
@@ -199,7 +251,7 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
     }
 }
 
-//PANTALLAS BASICAS
+// Pantallas Básicas
 @Composable
 fun PantallaBienvenida(onTimeout: () -> Unit) {
     LaunchedEffect(true) {
@@ -231,8 +283,8 @@ fun PantallaListaPlatos(viewModel: ComidaViewModel, onExit: () -> Unit, onPlatoC
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues) //Padding para no tapar el contenido con el TopBar
-                .padding(16.dp) //Padding estético lateral
+                .padding(paddingValues)
+                .padding(16.dp)
                 .animateContentSize(animationSpec = tween(500))
         ) {
 
@@ -340,7 +392,7 @@ fun PantallaCarrito(viewModel: ComidaViewModel) {
     }
 }
 
-//PANTALLA DE USUARIO
+// Pantalla de Usuario
 @Composable
 fun PantallaUsuario(viewModel: ComidaViewModel) {
     val usuario by viewModel.usuarioActivo.collectAsState()
@@ -438,7 +490,7 @@ fun PantallaUsuario(viewModel: ComidaViewModel) {
                             Spacer(modifier = Modifier.height(24.dp))
                             Button(onClick = {
                                 if (nombre.isEmpty() || apellido.isEmpty() || direccion.isEmpty() || ciudad.isEmpty() || correo.isEmpty() || telefono.isEmpty()) {
-                                    Toast.makeText(context, "Debe completar todos los campos para crear su registro", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, "Debe completar todos los campos para registrar sus datos", Toast.LENGTH_LONG).show()
                                 } else if (!correo.contains("@")) {
                                     Toast.makeText(context, "El correo debe contener un @", Toast.LENGTH_LONG).show()
                                 } else {
