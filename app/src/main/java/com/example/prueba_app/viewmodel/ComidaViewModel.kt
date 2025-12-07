@@ -13,8 +13,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 class ComidaViewModel(private val repositorio: RepositorioComida) : ViewModel() {
 
-    //GESTION DE SESION
-    private val _idUsuarioSesion = MutableStateFlow<Int>(-1) // -1 indica no logueado
+    //Gestión de Sesión
+    private val _idUsuarioSesion = MutableStateFlow<Int>(-1)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val usuarioActivo: StateFlow<Usuario?> = _idUsuarioSesion
@@ -23,9 +23,13 @@ class ComidaViewModel(private val repositorio: RepositorioComida) : ViewModel() 
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    //LOS PLATOS Y BUSQUEDA
+    //Platos y Busqueda
     private val _consultaBusqueda = MutableStateFlow("")
     val consultaBusqueda = _consultaBusqueda.asStateFlow()
+
+    // NUEVO: Estado para la visibilidad de la barra de búsqueda
+    private val _buscadorVisible = MutableStateFlow(false)
+    val buscadorVisible = _buscadorVisible.asStateFlow()
 
     val listaPlatos: StateFlow<List<Plato>> = repositorio.platos
         .combine(_consultaBusqueda) { platos, query ->
@@ -33,7 +37,7 @@ class ComidaViewModel(private val repositorio: RepositorioComida) : ViewModel() 
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    //EL CARRITO
+    //Carrito
     val carrito: StateFlow<List<DetalleCarrito>> = repositorio.carrito
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -51,7 +55,7 @@ class ComidaViewModel(private val repositorio: RepositorioComida) : ViewModel() 
         }
     }
 
-    //FUNCIONES DE USUARIO
+    //Funciones de Usuario
 
     fun iniciarSesion(correo: String, onError: () -> Unit, onSuccess: () -> Unit) {
         viewModelScope.launch {
@@ -65,12 +69,11 @@ class ComidaViewModel(private val repositorio: RepositorioComida) : ViewModel() 
         }
     }
 
-    // onSuccess PARA CONFIRMAR EL GUARDADO
     fun registrarUsuario(usuario: Usuario, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             val nuevoId = repositorio.registrarUsuario(usuario)
             _idUsuarioSesion.value = nuevoId.toInt()
-            onSuccess() // Ejecutamos la acción (navegación/toast) solo al terminar
+            onSuccess()
         }
     }
 
@@ -88,10 +91,20 @@ class ComidaViewModel(private val repositorio: RepositorioComida) : ViewModel() 
         }
     }
 
-    //FUNCIONES VARIAS
+    //Funciones Varias
 
     fun actualizarBusqueda(query: String) {
         _consultaBusqueda.value = query
+    }
+
+    //Mostrar y esconder barra busqueda
+    fun toggleBuscador() {
+        _buscadorVisible.value = !_buscadorVisible.value
+    }
+
+    //Mostrar buscador
+    fun mostrarBuscador(mostrar: Boolean) {
+        _buscadorVisible.value = mostrar
     }
 
     fun agregarAlCarrito(platoId: Int, onNoRegistrado: () -> Unit, onExito: () -> Unit) {

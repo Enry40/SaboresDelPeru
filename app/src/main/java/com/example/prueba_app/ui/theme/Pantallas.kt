@@ -44,10 +44,52 @@ import com.example.prueba_app.model.Plato
 import com.example.prueba_app.model.Usuario
 import com.example.prueba_app.viewmodel.ComidaViewModel
 
-//UTILIDAD PARA MONEDA
+//UTILIDAD PARA FORMATEAR A CLP
 fun formatoCLP(monto: Int): String {
     val format = NumberFormat.getCurrencyInstance(Locale("es", "CL"))
     return format.format(monto)
+}
+
+//COMPONENTE: TOP BAR CON MENU
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BarraSuperior(onExit: () -> Unit) {
+    var mostrarMenu by remember { mutableStateOf(false) }
+
+    CenterAlignedTopAppBar(
+        title = {
+            Text(
+                "MENU DE SELECCIÓN",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            actionIconContentColor = MaterialTheme.colorScheme.onSurface
+        ),
+        actions = {
+            IconButton(onClick = { mostrarMenu = true }) {
+                Icon(Icons.Default.MoreVert, contentDescription = "Opciones")
+            }
+            DropdownMenu(
+                expanded = mostrarMenu,
+                onDismissRequest = { mostrarMenu = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Salir") },
+                    onClick = {
+                        mostrarMenu = false
+                        onExit()
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.ExitToApp, contentDescription = null, tint = Color.Red)
+                    }
+                )
+            }
+        }
+    )
 }
 
 //PANTALLA PRINCIPAL (Scaffold con Navegación)
@@ -66,7 +108,18 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
                         icon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
                         label = { Text("Buscar") },
                         selected = currentRoute == "home",
-                        onClick = { navController.navigate("home") }
+                        onClick = {
+                            if (currentRoute != "home") {
+                                viewModel.mostrarBuscador(true)
+                                navController.navigate("home") {
+                                    popUpTo("home") { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            } else {
+                                viewModel.toggleBuscador()
+                            }
+                        }
                     )
                     NavigationBarItem(
                         icon = {
@@ -78,13 +131,29 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
                         },
                         label = { Text("Carrito") },
                         selected = currentRoute == "carrito",
-                        onClick = { navController.navigate("carrito") }
+                        onClick = {
+                            if (currentRoute != "carrito") {
+                                navController.navigate("carrito") {
+                                    popUpTo("home") { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        }
                     )
                     NavigationBarItem(
                         icon = { Icon(Icons.Default.Person, contentDescription = "Usuario") },
                         label = { Text("Usuario") },
                         selected = currentRoute == "usuario",
-                        onClick = { navController.navigate("usuario") }
+                        onClick = {
+                            if (currentRoute != "usuario") {
+                                navController.navigate("usuario") {
+                                    popUpTo("home") { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        }
                     )
                 }
             }
@@ -93,7 +162,11 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
         NavHost(
             navController = navController,
             startDestination = "splash",
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding),
+            enterTransition = { TransicionesApp.enter(this) },
+            exitTransition = { TransicionesApp.exit(this) },
+            popEnterTransition = { TransicionesApp.popEnter(this) },
+            popExitTransition = { TransicionesApp.popExit(this) }
         ) {
             composable("splash") {
                 PantallaBienvenida(onTimeout = {
@@ -103,7 +176,8 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
                 })
             }
             composable("home") {
-                PantallaListaPlatos(viewModel) { platoId ->
+
+                PantallaListaPlatos(viewModel, onExit = onExitApp) { platoId ->
                     navController.navigate("detalle/$platoId")
                 }
             }
@@ -144,28 +218,58 @@ fun PantallaBienvenida(onTimeout: () -> Unit) {
 }
 
 @Composable
-fun PantallaListaPlatos(viewModel: ComidaViewModel, onPlatoClick: (Int) -> Unit) {
+fun PantallaListaPlatos(viewModel: ComidaViewModel, onExit: () -> Unit, onPlatoClick: (Int) -> Unit) {
     val platos by viewModel.listaPlatos.collectAsState()
     val busqueda by viewModel.consultaBusqueda.collectAsState()
+    val esVisible by viewModel.buscadorVisible.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        OutlinedTextField(
-            value = busqueda,
-            onValueChange = { viewModel.actualizarBusqueda(it) },
-            label = { Text("Buscar plato...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(platos) { plato ->
-                Card(modifier = Modifier.fillMaxWidth().clickable { onPlatoClick(plato.id) }, elevation = CardDefaults.cardElevation(4.dp)) {
-                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Fastfood, contentDescription = null, modifier = Modifier.size(60.dp), tint = Color(0xFFD32F2F))
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text(plato.nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text(formatoCLP(plato.precio), color = Color(0xFF388E3C))
+    Scaffold(
+        topBar = {
+            BarraSuperior(onExit = onExit)
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues) //Padding para no tapar el contenido con el TopBar
+                .padding(16.dp) //Padding estético lateral
+                .animateContentSize(animationSpec = tween(500))
+        ) {
+
+            AnimatedVisibility(
+                visible = esVisible,
+                enter = expandVertically(animationSpec = tween(500)) + slideInVertically(
+                    initialOffsetY = { it * 2 },
+                    animationSpec = tween(500)
+                ) + fadeIn(animationSpec = tween(500)),
+
+                exit = shrinkVertically(animationSpec = tween(500)) + slideOutVertically(
+                    targetOffsetY = { it * 2 },
+                    animationSpec = tween(500)
+                ) + fadeOut(animationSpec = tween(500))
+            ) {
+                Column {
+                    OutlinedTextField(
+                        value = busqueda,
+                        onValueChange = { viewModel.actualizarBusqueda(it) },
+                        label = { Text("Buscar plato...") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(platos) { plato ->
+                    Card(modifier = Modifier.fillMaxWidth().clickable { onPlatoClick(plato.id) }, elevation = CardDefaults.cardElevation(4.dp)) {
+                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Fastfood, contentDescription = null, modifier = Modifier.size(60.dp), tint = Color(0xFFD32F2F))
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column {
+                                Text(plato.nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text(formatoCLP(plato.precio), color = Color(0xFF388E3C))
+                            }
                         }
                     }
                 }
@@ -242,10 +346,7 @@ fun PantallaUsuario(viewModel: ComidaViewModel) {
     val usuario by viewModel.usuarioActivo.collectAsState()
     val context = LocalContext.current
 
-    //ESTADOS DE NAVEGACIÓN INTERNA
     var vistaActual by remember { mutableStateOf("menu") }
-
-    //ESTADOS DEL FORMULARIO
     var nombre by remember { mutableStateOf("") }
     var apellido by remember { mutableStateOf("") }
     var direccion by remember { mutableStateOf("") }
@@ -253,11 +354,9 @@ fun PantallaUsuario(viewModel: ComidaViewModel) {
     var correo by remember { mutableStateOf("") }
     var telefono by remember { mutableStateOf("") }
 
-    //ESTADOS DE MODALES
     var mostrarDialogoEliminar by remember { mutableStateOf(false) }
     var mostrarDialogoDatos by remember { mutableStateOf(false) }
 
-    //SINCRONIZACION DE DATOS DE USUARIO
     LaunchedEffect(usuario) {
         usuario?.let {
             nombre = it.nombre
@@ -276,7 +375,6 @@ fun PantallaUsuario(viewModel: ComidaViewModel) {
         }
     }
 
-    //MANEJO DEL BOTÓN ATRÁS
     BackHandler(enabled = vistaActual != "menu" && vistaActual != "perfil_menu") {
         if (usuario == null) {
             vistaActual = "menu"
@@ -287,26 +385,16 @@ fun PantallaUsuario(viewModel: ComidaViewModel) {
 
     Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         if (usuario == null) {
-
-            //ZONA NO AUTENTICADA (Invitado)
             when (vistaActual) {
                 "menu" -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Spacer(modifier = Modifier.weight(1f))
                         Icon(Icons.Default.AccountCircle, contentDescription = null, modifier = Modifier.size(120.dp), tint = Color.Gray)
                         Text("Bienvenido", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 16.dp))
                         Spacer(modifier = Modifier.weight(1f))
-
-                        Button(onClick = { vistaActual = "login" }, modifier = Modifier.fillMaxWidth().height(50.dp)) {
-                            Text("Iniciar Sesión")
-                        }
+                        Button(onClick = { vistaActual = "login" }, modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("Iniciar Sesión") }
                         Spacer(modifier = Modifier.height(16.dp))
-                        OutlinedButton(onClick = { vistaActual = "registro" }, modifier = Modifier.fillMaxWidth().height(50.dp)) {
-                            Text("Registrarse")
-                        }
+                        OutlinedButton(onClick = { vistaActual = "registro" }, modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("Registrarse") }
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
@@ -322,14 +410,10 @@ fun PantallaUsuario(viewModel: ComidaViewModel) {
                                 Spacer(modifier = Modifier.height(32.dp))
                                 Button(onClick = {
                                     if (correo.isNotEmpty()) {
-                                        viewModel.iniciarSesion(
-                                            correo = correo,
-                                            onError = { Toast.makeText(context, "Usuario no registrado, debe registrarse", Toast.LENGTH_LONG).show() },
-                                            onSuccess = {
-                                                Toast.makeText(context, "Bienvenido", Toast.LENGTH_SHORT).show()
-                                                correo = ""
-                                            }
-                                        )
+                                        viewModel.iniciarSesion(correo = correo, onError = { Toast.makeText(context, "Usuario no registrado, debe registrarse", Toast.LENGTH_LONG).show() }, onSuccess = {
+                                            Toast.makeText(context, "Bienvenido", Toast.LENGTH_SHORT).show()
+                                            correo = ""
+                                        })
                                     } else {
                                         Toast.makeText(context, "Ingrese su correo", Toast.LENGTH_SHORT).show()
                                     }
@@ -353,19 +437,15 @@ fun PantallaUsuario(viewModel: ComidaViewModel) {
                             OutlinedTextField(value = telefono, onValueChange = { telefono = it }, label = { Text("Teléfono") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth())
                             Spacer(modifier = Modifier.height(24.dp))
                             Button(onClick = {
-                                // CORRECCIÓN: Validación de campos vacíos Y que el correo contenga '@'
                                 if (nombre.isEmpty() || apellido.isEmpty() || direccion.isEmpty() || ciudad.isEmpty() || correo.isEmpty() || telefono.isEmpty()) {
-                                    Toast.makeText(context, "Debe completar todos los campos para modificar sus datos", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, "Debe completar todos los campos para crear su registro", Toast.LENGTH_LONG).show()
                                 } else if (!correo.contains("@")) {
                                     Toast.makeText(context, "El correo debe contener un @", Toast.LENGTH_LONG).show()
                                 } else {
-                                    viewModel.registrarUsuario(
-                                        Usuario(nombre = nombre, apellido = apellido, direccion = direccion, ciudad = ciudad, correo = correo, telefono = telefono),
-                                        onSuccess = {
-                                            Toast.makeText(context, "Registro exitoso", Toast.LENGTH_SHORT).show()
-                                            nombre = ""; apellido = ""; direccion = ""; ciudad = ""; correo = ""; telefono = ""
-                                        }
-                                    )
+                                    viewModel.registrarUsuario(Usuario(nombre = nombre, apellido = apellido, direccion = direccion, ciudad = ciudad, correo = correo, telefono = telefono), onSuccess = {
+                                        Toast.makeText(context, "Registro exitoso", Toast.LENGTH_SHORT).show()
+                                        nombre = ""; apellido = ""; direccion = ""; ciudad = ""; correo = ""; telefono = ""
+                                    })
                                 }
                             }, modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("REGISTRARME") }
                             Spacer(modifier = Modifier.height(200.dp))
@@ -374,116 +454,56 @@ fun PantallaUsuario(viewModel: ComidaViewModel) {
                 }
             }
         } else {
-
-            // ZONA AUTENTICADA (Perfil Usuario)
             val usuarioLogueado = usuario!!
-
             when (vistaActual) {
                 "perfil_menu" -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Spacer(modifier = Modifier.height(40.dp))
                         Icon(Icons.Default.AccountCircle, contentDescription = null, modifier = Modifier.size(120.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("Hola, ${usuarioLogueado.nombre}", style = MaterialTheme.typography.headlineMedium)
-
                         Spacer(modifier = Modifier.weight(1f))
-
-                        Button(
-                            onClick = { mostrarDialogoDatos = true },
-                            modifier = Modifier.fillMaxWidth().height(50.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                        ) {
+                        Button(onClick = { mostrarDialogoDatos = true }, modifier = Modifier.fillMaxWidth().height(50.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
                             Icon(Icons.Default.Visibility, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("MOSTRAR DATOS")
                         }
                         Spacer(modifier = Modifier.height(12.dp))
-
-                        Button(
-                            onClick = { vistaActual = "perfil_modificar" },
-                            modifier = Modifier.fillMaxWidth().height(50.dp)
-                        ) {
-                            Text("MODIFICAR DATOS")
-                        }
+                        Button(onClick = { vistaActual = "perfil_modificar" }, modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("MODIFICAR DATOS") }
                         Spacer(modifier = Modifier.height(12.dp))
-
-                        OutlinedButton(
-                            onClick = { viewModel.cerrarSesion() },
-                            modifier = Modifier.fillMaxWidth().height(50.dp)
-                        ) {
-                            Text("CERRAR SESIÓN")
-                        }
+                        OutlinedButton(onClick = { viewModel.cerrarSesion() }, modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("CERRAR SESIÓN") }
                         Spacer(modifier = Modifier.height(12.dp))
-
-                        OutlinedButton(
-                            onClick = { mostrarDialogoEliminar = true },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
-                            modifier = Modifier.fillMaxWidth().height(50.dp)
-                        ) {
-                            Text("ELIMINAR USUARIO")
-                        }
+                        OutlinedButton(onClick = { mostrarDialogoEliminar = true }, colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red), modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("ELIMINAR USUARIO") }
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
                 "perfil_modificar" -> {
                     Column(modifier = Modifier.fillMaxSize()) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = { vistaActual = "perfil_menu" }) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
-                            }
+                            IconButton(onClick = { vistaActual = "perfil_menu" }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver") }
                             Text("Modificar Mis Datos", style = MaterialTheme.typography.titleLarge)
                         }
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                                .verticalScroll(rememberScrollState())
-                                .padding(top = 16.dp)
-                        ) {
+                        Column(modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(top = 16.dp)) {
                             OutlinedTextField(value = direccion, onValueChange = { direccion = it }, label = { Text("Dirección") }, modifier = Modifier.fillMaxWidth())
                             OutlinedTextField(value = ciudad, onValueChange = { ciudad = it }, label = { Text("Ciudad") }, modifier = Modifier.fillMaxWidth())
-                            OutlinedTextField(
-                                value = correo,
-                                onValueChange = { correo = it },
-                                label = { Text("Correo (ej: @)") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            OutlinedTextField(value = correo, onValueChange = { correo = it }, label = { Text("Correo (ej: @)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth())
                             OutlinedTextField(value = telefono, onValueChange = { telefono = it }, label = { Text("Teléfono") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth())
                         }
-
-                        Button(
-                            onClick = {
-                                if (direccion.isEmpty() || ciudad.isEmpty() || correo.isEmpty() || telefono.isEmpty()) {
-                                    Toast.makeText(context, "Debe completar todos los campos para modificar sus datos", Toast.LENGTH_LONG).show()
-                                } else if (!correo.contains("@")) {
-                                    Toast.makeText(context, "El correo debe contener un @", Toast.LENGTH_LONG).show()
-                                } else {
-                                    viewModel.registrarUsuario(
-                                        Usuario(
-                                            id = usuarioLogueado.id,
-                                            nombre = usuarioLogueado.nombre,
-                                            apellido = usuarioLogueado.apellido,
-                                            direccion = direccion,
-                                            ciudad = ciudad,
-                                            correo = correo,
-                                            telefono = telefono
-                                        ),
-                                        onSuccess = {
-                                            Toast.makeText(context, "Datos actualizados correctamente", Toast.LENGTH_SHORT).show()
-                                            vistaActual = "perfil_menu"
-                                        }
-                                    )
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth().height(50.dp)
-                        ) {
-                            Text("GUARDAR CAMBIOS")
-                        }
+                        Button(onClick = {
+                            if (direccion.isEmpty() || ciudad.isEmpty() || correo.isEmpty() || telefono.isEmpty()) {
+                                Toast.makeText(context, "Debe completar todos los campos para modificar sus datos", Toast.LENGTH_LONG).show()
+                            } else if (!correo.contains("@")) {
+                                Toast.makeText(context, "El correo debe contener un @", Toast.LENGTH_LONG).show()
+                            } else {
+                                viewModel.registrarUsuario(
+                                    Usuario(id = usuarioLogueado.id, nombre = usuarioLogueado.nombre, apellido = usuarioLogueado.apellido, direccion = direccion, ciudad = ciudad, correo = correo, telefono = telefono),
+                                    onSuccess = {
+                                        Toast.makeText(context, "Datos actualizados correctamente", Toast.LENGTH_SHORT).show()
+                                        vistaActual = "perfil_menu"
+                                    }
+                                )
+                            }
+                        }, modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("GUARDAR CAMBIOS") }
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
@@ -491,72 +511,30 @@ fun PantallaUsuario(viewModel: ComidaViewModel) {
         }
     }
 
-    //MODALES FLOTANTES
-    //MODAL: Mostrar Datos
     if (mostrarDialogoDatos && usuario != null) {
         val usuarioDatos = usuario!!
         AlertDialog(
             onDismissRequest = { mostrarDialogoDatos = false },
-            title = {
-                Text(
-                    text = "Mis Datos Personales",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
-            },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Divider()
-                    Spacer(modifier = Modifier.height(8.dp))
-                    ItemDato("Nombre:", usuarioDatos.nombre)
-                    ItemDato("Apellido:", usuarioDatos.apellido)
-                    ItemDato("Dirección:", usuarioDatos.direccion)
-                    ItemDato("Ciudad:", usuarioDatos.ciudad)
-                    ItemDato("Correo:", usuarioDatos.correo)
-                    ItemDato("Teléfono:", usuarioDatos.telefono)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Divider()
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { mostrarDialogoDatos = false },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Cerrar")
-                }
-            }
+            title = { Text(text = "Mis Datos Personales", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+            text = { Column(modifier = Modifier.fillMaxWidth()) { Divider(); Spacer(modifier = Modifier.height(8.dp)); ItemDato("Nombre:", "${usuarioDatos.nombre} ${usuarioDatos.apellido}"); ItemDato("Dirección:", usuarioDatos.direccion); ItemDato("Ciudad:", usuarioDatos.ciudad); ItemDato("Correo:", usuarioDatos.correo); ItemDato("Teléfono:", usuarioDatos.telefono); Spacer(modifier = Modifier.height(8.dp)); Divider() } },
+            confirmButton = { Button(onClick = { mostrarDialogoDatos = false }, modifier = Modifier.fillMaxWidth()) { Text("Cerrar") } }
         )
     }
 
-    //MODAL: ELIMINAR USUARIO
     if (mostrarDialogoEliminar) {
         AlertDialog(
             onDismissRequest = { mostrarDialogoEliminar = false },
             title = { Text("Eliminar cuenta") },
             text = { Text("¿Está seguro de eliminar usuario?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.eliminarUsuarioActual()
-                    mostrarDialogoEliminar = false
-                    vistaActual = "menu"
-                }) { Text("Sí, eliminar", color = Color.Red) }
-            },
-            dismissButton = {
-                TextButton(onClick = { mostrarDialogoEliminar = false }) { Text("Cancelar") }
-            }
+            confirmButton = { TextButton(onClick = { viewModel.eliminarUsuarioActual(); mostrarDialogoEliminar = false; vistaActual = "menu" }) { Text("Sí, eliminar", color = Color.Red) } },
+            dismissButton = { TextButton(onClick = { mostrarDialogoEliminar = false }) { Text("Cancelar") } }
         )
     }
 }
 
 @Composable
 fun ItemDato(titulo: String, valor: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(titulo, fontWeight = FontWeight.SemiBold, color = Color.Gray)
         Text(valor, fontWeight = FontWeight.Normal, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
     }
