@@ -25,4 +25,14 @@ interface PruebaApi {
     // 5. Eliminar Usuario (DELETE)
     @DELETE("user/{id}")
     suspend fun deleteUser(@Path("id") id: Int): Response<Unit>
+
+    // CARRITO
+    // Agregar
+    @POST("carrito")
+    suspend fun addToCart(@Body request: CarritoRequest): Response<Unit>
+
+    // Reducir o eliminar item (Usar un endpoint específico para manejar la resta)
+    @POST("carrito/remove")
+    suspend fun removeFromCart(@Body request: CarritoRequest): Response<Unit>
+
 }

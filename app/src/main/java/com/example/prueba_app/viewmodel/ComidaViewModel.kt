@@ -27,7 +27,7 @@ class ComidaViewModel(private val repositorio: RepositorioComida) : ViewModel() 
     private val _consultaBusqueda = MutableStateFlow("")
     val consultaBusqueda = _consultaBusqueda.asStateFlow()
 
-    // NUEVO: Estado para la visibilidad de la barra de búsqueda
+    // Estado para la visibilidad de la barra de búsqueda
     private val _buscadorVisible = MutableStateFlow(false)
     val buscadorVisible = _buscadorVisible.asStateFlow()
 
@@ -107,20 +107,24 @@ class ComidaViewModel(private val repositorio: RepositorioComida) : ViewModel() 
         _buscadorVisible.value = mostrar
     }
 
+    //Se pasa el ID del usuario al repositorio
     fun agregarAlCarrito(platoId: Int, onNoRegistrado: () -> Unit, onExito: () -> Unit) {
-        if (usuarioActivo.value == null) {
+        val usuario = usuarioActivo.value
+        if (usuario == null) {
             onNoRegistrado()
         } else {
             viewModelScope.launch {
-                repositorio.agregarAlCarrito(platoId)
+                repositorio.agregarAlCarrito(platoId, usuario.id)
                 onExito()
             }
         }
     }
 
+    //Se pasa el ID del usuario al repositorio
     fun eliminarDelCarrito(detalle: DetalleCarrito) {
+        val usuario = usuarioActivo.value
         viewModelScope.launch {
-            repositorio.reducirCantidadOEliminar(detalle)
+            repositorio.reducirCantidadOEliminar(detalle, usuario?.id ?: -1)
         }
     }
 }
