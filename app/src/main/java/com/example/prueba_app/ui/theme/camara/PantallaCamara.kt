@@ -70,6 +70,7 @@ fun PantallaCamara(onExit: () -> Unit) { // Recibimos la función de salida
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("Esperando permiso de cámara...")
+
             // Opción de salir también si no hay permiso
             Button(onClick = onExit, modifier = Modifier.padding(top = 16.dp)) {
                 Text("Cancelar")
