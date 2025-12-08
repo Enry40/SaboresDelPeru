@@ -2,13 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- PERMISO DE INTERNET OBLIGATORIO PARA RETROFIT -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- PERMISOS DE CÁMARA -->
     <uses-feature android:name="android.hardware.camera.any" />
     <uses-permission android:name="android.permission.CAMERA" />
 
     <!--Para guardar en galería (aunque scoped storage lo maneja, es buena práctica declararlo para compatibilidad) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
-
 
     <application
         android:allowBackup="true"

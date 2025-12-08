@@ -90,4 +90,11 @@ dependencies {
     implementation("androidx.camera:camera-view:${camerax_version}")
     implementation("androidx.camera:camera-extensions:${camerax_version}")
 
+    // RETROFIT Y GSON
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+    // Logging interceptor para ver las peticiones en el Logcat
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
 }
