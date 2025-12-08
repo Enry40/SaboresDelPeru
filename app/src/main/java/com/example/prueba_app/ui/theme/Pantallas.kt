@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -49,6 +50,30 @@ import com.example.prueba_app.ui.theme.camara.PantallaCamara
 fun formatoCLP(monto: Int): String {
     val format = NumberFormat.getCurrencyInstance(Locale("es", "CL"))
     return format.format(monto)
+}
+
+// Cargar Imagen desde Drawable por nombre
+@Composable
+fun ImagenPlato(nombreImagen: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    // Busca el ID del recurso usando el nombre (String) almacenado en la BD
+    val resourceId = remember(nombreImagen) {
+        context.resources.getIdentifier(nombreImagen, "drawable", context.packageName)
+    }
+
+    if (resourceId != 0) {
+        Image(
+            painter = painterResource(id = resourceId),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+        )
+    } else {
+        // Fallback si no encuentra la imagen
+        Box(modifier = modifier.background(Color.LightGray), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Restaurant, contentDescription = null, tint = Color.Gray)
+        }
+    }
 }
 
 // Barra Superior con Menú
@@ -100,8 +125,6 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val cantidadCarrito by viewModel.cantidadProductos.collectAsState()
-
-    // Estado de visibilidad del buscador
     val esBuscadorVisible by viewModel.buscadorVisible.collectAsState()
 
     Scaffold(
@@ -112,14 +135,11 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
                     NavigationBarItem(
                         icon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
                         label = { Text("Buscar") },
-                        // Seleccionado solo si estamos en home Y el buscador es visible
                         selected = currentRoute == "home" && esBuscadorVisible,
                         onClick = {
                             if (currentRoute == "home") {
-                                // Si ya estamos en home, alternamos (mostrar/esconder)
                                 viewModel.toggleBuscador()
                             } else {
-                                // Si venimos de otra pantalla, vamos a home y forzamos mostrar
                                 viewModel.mostrarBuscador(true)
                                 navController.navigate("home") {
                                     popUpTo("home") { saveState = true }
@@ -129,7 +149,6 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
                             }
                         }
                     )
-
                     // 2. CARRITO
                     NavigationBarItem(
                         icon = {
@@ -151,14 +170,12 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
                             }
                         }
                     )
-
-                    // 3. MENÚ (Oculta buscador)
+                    // 3. MENÚ
                     NavigationBarItem(
                         icon = { Icon(Icons.Default.RestaurantMenu, contentDescription = "Menú") },
                         label = { Text("Menú") },
                         selected = currentRoute == "home" && !esBuscadorVisible,
                         onClick = {
-                            // Ocultamos el buscador para ver solo la lista
                             viewModel.mostrarBuscador(false)
                             if (currentRoute != "home") {
                                 navController.navigate("home") {
@@ -169,7 +186,6 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
                             }
                         }
                     )
-
                     // 4. CÁMARA
                     NavigationBarItem(
                         icon = { Icon(Icons.Default.CameraAlt, contentDescription = "Cámara") },
@@ -185,7 +201,6 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
                             }
                         }
                     )
-
                     // 5. USUARIO
                     NavigationBarItem(
                         icon = { Icon(Icons.Default.Person, contentDescription = "Usuario") },
@@ -251,7 +266,6 @@ fun AppComidaPeruana(viewModel: ComidaViewModel, onExitApp: () -> Unit) {
     }
 }
 
-// Pantallas Básicas
 @Composable
 fun PantallaBienvenida(onTimeout: () -> Unit) {
     LaunchedEffect(true) {
@@ -290,15 +304,8 @@ fun PantallaListaPlatos(viewModel: ComidaViewModel, onExit: () -> Unit, onPlatoC
 
             AnimatedVisibility(
                 visible = esVisible,
-                enter = expandVertically(animationSpec = tween(500)) + slideInVertically(
-                    initialOffsetY = { it * 2 },
-                    animationSpec = tween(500)
-                ) + fadeIn(animationSpec = tween(500)),
-
-                exit = shrinkVertically(animationSpec = tween(500)) + slideOutVertically(
-                    targetOffsetY = { it * 2 },
-                    animationSpec = tween(500)
-                ) + fadeOut(animationSpec = tween(500))
+                enter = expandVertically(animationSpec = tween(500)) + slideInVertically(initialOffsetY = { it * 2 }, animationSpec = tween(500)) + fadeIn(animationSpec = tween(500)),
+                exit = shrinkVertically(animationSpec = tween(500)) + slideOutVertically(targetOffsetY = { it * 2 }, animationSpec = tween(500)) + fadeOut(animationSpec = tween(500))
             ) {
                 Column {
                     OutlinedTextField(
@@ -316,7 +323,13 @@ fun PantallaListaPlatos(viewModel: ComidaViewModel, onExit: () -> Unit, onPlatoC
                 items(platos) { plato ->
                     Card(modifier = Modifier.fillMaxWidth().clickable { onPlatoClick(plato.id) }, elevation = CardDefaults.cardElevation(4.dp)) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Fastfood, contentDescription = null, modifier = Modifier.size(60.dp), tint = Color(0xFFD32F2F))
+                            // IMAGEN REAL EN LISTA
+                            ImagenPlato(
+                                nombreImagen = plato.imagenUrl,
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
                             Spacer(modifier = Modifier.width(16.dp))
                             Column {
                                 Text(plato.nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -338,14 +351,24 @@ fun PantallaDetallePlato(platoId: Int?, viewModel: ComidaViewModel) {
 
     if (plato != null) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(16.dp)).background(Color.LightGray), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Restaurant, contentDescription = null, modifier = Modifier.size(80.dp), tint = Color.Gray)
+            // IMAGEN REAL EN DETALLE
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(250.dp)
+                    .clip(RoundedCornerShape(16.dp))
+            ) {
+                ImagenPlato(
+                    nombreImagen = plato.imagenUrl,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
+
             Spacer(modifier = Modifier.height(24.dp))
             Text(plato.nombre, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text(formatoCLP(plato.precio), style = MaterialTheme.typography.headlineSmall, color = Color(0xFF388E3C))
             Spacer(modifier = Modifier.height(16.dp))
-            Text(plato.descripcion)
+            Text(plato.descripcion, style = MaterialTheme.typography.bodyLarge)
             Spacer(modifier = Modifier.weight(1f))
             Button(
                 onClick = {
@@ -356,7 +379,11 @@ fun PantallaDetallePlato(platoId: Int?, viewModel: ComidaViewModel) {
                     )
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp)
-            ) { Text("AGREGAR") }
+            ) {
+                Icon(Icons.Default.AddShoppingCart, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("AGREGAR AL CARRITO")
+            }
         }
     }
 }
@@ -368,9 +395,19 @@ fun PantallaCarrito(viewModel: ComidaViewModel) {
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Tu Pedido", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(16.dp))
+
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(carrito) { detalle ->
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // IMAGEN PEQUEÑA EN CARRITO
+                    ImagenPlato(
+                        nombreImagen = detalle.plato.imagenUrl,
+                        modifier = Modifier
+                            .size(60.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(detalle.plato.nombre, fontWeight = FontWeight.Bold)
                         Text("${detalle.cantidad} x ${formatoCLP(detalle.plato.precio)}")
@@ -490,7 +527,7 @@ fun PantallaUsuario(viewModel: ComidaViewModel) {
                             Spacer(modifier = Modifier.height(24.dp))
                             Button(onClick = {
                                 if (nombre.isEmpty() || apellido.isEmpty() || direccion.isEmpty() || ciudad.isEmpty() || correo.isEmpty() || telefono.isEmpty()) {
-                                    Toast.makeText(context, "Debe completar todos los campos para registrar sus datos", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, "Debe completar todos los campos para modificar sus datos", Toast.LENGTH_LONG).show()
                                 } else if (!correo.contains("@")) {
                                     Toast.makeText(context, "El correo debe contener un @", Toast.LENGTH_LONG).show()
                                 } else {
@@ -569,7 +606,7 @@ fun PantallaUsuario(viewModel: ComidaViewModel) {
             onDismissRequest = { mostrarDialogoDatos = false },
             title = { Text(text = "Mis Datos Personales", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
             text = { Column(modifier = Modifier.fillMaxWidth()) { Divider(); Spacer(modifier = Modifier.height(8.dp)); ItemDato("Nombre:", "${usuarioDatos.nombre} ${usuarioDatos.apellido}"); ItemDato("Dirección:", usuarioDatos.direccion); ItemDato("Ciudad:", usuarioDatos.ciudad); ItemDato("Correo:", usuarioDatos.correo); ItemDato("Teléfono:", usuarioDatos.telefono); Spacer(modifier = Modifier.height(8.dp)); Divider() } },
-            confirmButton = { Button(onClick = { mostrarDialogoDatos = false }, modifier = Modifier.fillMaxWidth()) { Text("Cerrar") } }
+            confirmButton = { Button(onClick = { mostrarDialogoDatos = false }, modifier = Modifier.fillMaxWidth()) { Text("Atrás / Cerrar") } }
         )
     }
 
