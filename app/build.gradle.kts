@@ -97,4 +97,21 @@ dependencies {
     // Logging interceptor para ver las peticiones en el Logcat
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // Unit tests (JVM)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("app.cash.turbine:turbine:1.1.0")
+
+// Instrumentation tests (device/emulator)
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    androidTestImplementation("androidx.test:core-ktx:1.6.1")
+    androidTestImplementation("androidx.room:room-testing:2.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("junit:junit:4.13.2")
+
 }
