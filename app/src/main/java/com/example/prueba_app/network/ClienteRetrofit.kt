@@ -7,24 +7,24 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object ClientRetrofit {
 
-    // ¡IMPORTANTE! Reemplazar URL con la base de Xano y debe terminar con un '/'
-
-    private const val BASE_URL = "https://x8ki-letl-twmt.n7.xano.io/api:TU_GRUPO_API/"
+    // ⚠️ CAMBIA ESTO:
+    // - Si es servidor en tu PC: "http://10.0.2.2:PUERTO/"
+    // - Debe terminar con "/"
+    private const val BASE_URL = "https://TU_BASE_URL_AQUI/"
 
     private val logging = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
     }
 
-    private val httpClient = OkHttpClient.Builder()
+    private val client: OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(logging)
         .build()
 
-    val api: PruebaApi by lazy {
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .client(httpClient)
-            .build()
-            .create(PruebaApi::class.java)
-    }
+    private val retrofit: Retrofit = Retrofit.Builder()
+        .baseUrl(BASE_URL)
+        .client(client)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+
+    val api: InterfazApi = retrofit.create(InterfazApi::class.java)
 }
