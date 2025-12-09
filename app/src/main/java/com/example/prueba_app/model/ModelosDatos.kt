@@ -45,6 +45,10 @@ interface PlatoDao {
     @Query("SELECT * FROM platos")
     fun obtenerPlatos(): Flow<List<Plato>>
 
+    // ✅ NUEVO: para tests (sin Flow)
+    @Query("SELECT * FROM platos")
+    suspend fun obtenerPlatosList(): List<Plato>
+
     @Query("SELECT * FROM platos WHERE id = :id")
     suspend fun obtenerPlatoPorId(id: Int): Plato?
 
