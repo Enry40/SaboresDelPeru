@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Plato::class, Usuario::class, ItemCarrito::class], version = 1, exportSchema = false)
+@Database(entities = [Plato::class, Usuario::class, ItemCarrito::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun platoDao(): PlatoDao
     abstract fun usuarioDao(): UsuarioDao
@@ -21,7 +21,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "saboresdelperu_db"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }

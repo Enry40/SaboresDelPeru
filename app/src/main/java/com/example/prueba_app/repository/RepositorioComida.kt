@@ -4,27 +4,33 @@ import android.util.Log
 import com.example.prueba_app.model.*
 import com.example.prueba_app.network.CarritoRequest
 import com.example.prueba_app.network.ClientRetrofit
-import com.example.prueba_app.network.LoginRequest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
 class RepositorioComida(private val db: AppDatabase) {
 
+    // CORREGIDO: Usamos el nombre correcto del objeto Singleton
     private val api = ClientRetrofit.api
 
-    // PLATOS
+    // --- PLATOS ---
     val platos: Flow<List<Plato>> = db.platoDao().obtenerPlatos()
 
     suspend fun inicializarDatos() {
         try {
+            Log.d("API", "Intentando descargar platos...")
             val response = api.getPlatos()
             if (response.isSuccessful && response.body() != null) {
+                Log.d("API", "¡Platos descargados! Cantidad: ${response.body()!!.size}")
                 db.platoDao().insertarPlatos(response.body()!!)
+            } else {
+                // AQUÍ VERÁS EL ERROR SI FALLA
+                Log.e("API", "Error Platos: ${response.code()} - ${response.errorBody()?.string()}")
             }
         } catch (e: Exception) {
-            Log.e("API", "Error platos: ${e.message}")
+            Log.e("API", "Excepción Platos: ${e.message}")
         }
 
+        // Si no hay datos, cargamos los locales por defecto
         if (db.platoDao().contarPlatos() == 0) {
             val platosIniciales = listOf(
                 Plato(nombre = "Ceviche Clásico", descripcion = "Pescado fresco marinado en limón.", precio = 12000, imagenUrl = "ceviche"),
@@ -40,14 +46,22 @@ class RepositorioComida(private val db: AppDatabase) {
         }
     }
 
-    // USUARIO Y SESIÓN
+    // --- USUARIO ---
     fun obtenerUsuarioActivo(id: Int): Flow<Usuario?> {
         return if (id != -1) db.usuarioDao().obtenerUsuarioPorId(id) else emptyFlow()
     }
 
-    suspend fun login(correo: String): Usuario? {
+    suspend fun login(correo: String, contrasena: String): Usuario? {
         try {
-            val response = api.login(LoginRequest(email = correo))
+            // Creamos el mapa simple: Clave "email" y "password" (lo que espera Xano)
+            val credenciales = mapOf(
+                "email" to correo,
+                "password" to contrasena
+            )
+
+            // Enviamos el mapa
+            val response = api.login(credenciales)
+
             if (response.isSuccessful && response.body() != null) {
                 val usuarioApi = response.body()!!.user
                 db.usuarioDao().insertarUsuario(usuarioApi)
@@ -59,69 +73,57 @@ class RepositorioComida(private val db: AppDatabase) {
         return db.usuarioDao().buscarPorCorreo(correo)
     }
 
-    // API CREAR (POST) y ACTUALIZAR (PUT)
     suspend fun registrarUsuario(usuario: Usuario): Long {
         try {
             if (usuario.id == 0) {
-                // ID es 0 -> Usuario nuevo -> POST (Signup)
+                Log.d("API", "Registrando usuario nuevo...")
                 val response = api.signup(usuario)
+
                 if (response.isSuccessful && response.body() != null) {
+                    Log.d("API", "¡Registro Exitoso!")
                     val usuarioCreado = response.body()!!.user
                     return db.usuarioDao().insertarUsuario(usuarioCreado)
+                } else {
+                    Log.e("API", "Error Signup: ${response.code()} - ${response.errorBody()?.string()}")
                 }
             } else {
-                // ID existe -> Usuario existente -> PUT (Update)
+                Log.d("API", "Actualizando usuario ${usuario.id}...")
                 val response = api.updateUser(usuario.id, usuario)
                 if (response.isSuccessful) {
-                    Log.d("API", "Usuario actualizado en Xano")
-
-                    // Si la API responde OK, actualizamos localmente
-                    // (Si la API devuelve el objeto actualizado, mejor usarlo, sino usamos el local)
+                    Log.d("API", "Actualización Exitosa")
                     return db.usuarioDao().insertarUsuario(usuario)
+                } else {
+                    Log.e("API", "Error Update: ${response.code()} - ${response.errorBody()?.string()}")
                 }
             }
         } catch (e: Exception) {
-            Log.e("API", "Operación usuario offline: ${e.message}")
+            Log.e("API", "Excepción Registro: ${e.message}")
         }
-
-        // Si falla la API o no hay internet, guardamos localmente
         return db.usuarioDao().insertarUsuario(usuario)
     }
 
-    // API ELIMINAR (DELETE)
     suspend fun eliminarUsuario(usuario: Usuario) {
         try {
-            // Intentamos borrar en la API primero
             val response = api.deleteUser(usuario.id)
-            if (response.isSuccessful) {
-                Log.d("API", "Usuario eliminado de Xano")
-            } else {
-                Log.e("API", "Error al eliminar en API: ${response.code()}")
-            }
+            if (!response.isSuccessful) Log.e("API", "Error Delete: ${response.code()}")
         } catch (e: Exception) {
-            Log.e("API", "Eliminar offline: ${e.message}")
+            Log.e("API", "Excepción Delete: ${e.message}")
         }
-
-        // Siempre eliminamos localmente (Room) para limpiar el dispositivo
         db.usuarioDao().eliminarUsuario(usuario)
         db.carritoDao().vaciarCarrito()
     }
 
-    // CARRITO (API y Local)
+    // --- CARRITO ---
     val carrito: Flow<List<DetalleCarrito>> = db.carritoDao().obtenerCarritoConDetalles()
 
-    // Modificado: Recibe userId para sincronizar con API
     suspend fun agregarAlCarrito(platoId: Int, userId: Int) {
-        // 1. API: Intentamos enviar a la nube
         try {
             if (userId != -1) {
-                api.addToCart(CarritoRequest(userId = userId, platoId = platoId, cantidad = 1))
+                val response = api.addToCart(CarritoRequest(userId = userId, platoId = platoId, cantidad = 1))
+                if (!response.isSuccessful) Log.e("API", "Error AddCart: ${response.code()}")
             }
-        } catch (e: Exception) {
-            Log.e("API", "Error al agregar carrito API: ${e.message}")
-        }
+        } catch (e: Exception) { Log.e("API", "Ex AddCart: ${e.message}") }
 
-        // 2. LOCAL: Siempre se actualiza Room para la UI inmediata
         val itemExistente = db.carritoDao().obtenerItemPorPlato(platoId)
         if (itemExistente != null) {
             db.carritoDao().actualizarItem(itemExistente.copy(cantidad = itemExistente.cantidad + 1))
@@ -130,29 +132,23 @@ class RepositorioComida(private val db: AppDatabase) {
         }
     }
 
-    // Recibe userId para sincronizar con API
     suspend fun reducirCantidadOEliminar(detalle: DetalleCarrito, userId: Int) {
-        // 1. API
         try {
             if (userId != -1) {
-                api.removeFromCart(
-                    CarritoRequest(
-                        userId = userId,
-                        platoId = detalle.plato.id,
-                        cantidad = 1
-                    )
-                )
+                val response = api.removeFromCart(CarritoRequest(userId = userId, platoId = detalle.plato.id, cantidad = 1))
+                if (!response.isSuccessful) Log.e("API", "Error RemoveCart: ${response.code()}")
             }
-        } catch (e: Exception) {
-            Log.e("API", "Error al eliminar carrito API: ${e.message}")
-        }
+        } catch (e: Exception) { Log.e("API", "Ex RemoveCart: ${e.message}") }
 
-        // 2. LOCAL
         val item = ItemCarrito(detalle.idItem, detalle.plato.id, detalle.cantidad)
         if (item.cantidad > 1) {
             db.carritoDao().actualizarItem(item.copy(cantidad = item.cantidad - 1))
         } else {
             db.carritoDao().eliminarItem(item)
         }
+    }
+
+    suspend fun eliminarItemCarritoPorId(idItem: Int) {
+        db.carritoDao().eliminarItemPorId(idItem)
     }
 }

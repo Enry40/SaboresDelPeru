@@ -7,12 +7,10 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object ClientRetrofit {
 
-    // ¡IMPORTANTE! Reemplazar URL con la base de Xano y debe terminar con un '/'
-
-    private const val BASE_URL = "https://x8ki-letl-twmt.n7.xano.io/api:TU_GRUPO_API/"
+    private const val BASE_URL = "https://x8ki-letl-twmt.n7.xano.io/api:RVCadJjR/"
 
     private val logging = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = HttpLoggingInterceptor.Level.BODY // Esto muestra todo el JSON en el Logcat
     }
 
     private val httpClient = OkHttpClient.Builder()

@@ -1,9 +1,8 @@
 package com.example.prueba_app.model
 
 import androidx.room.*
+import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.flow.Flow
-
-//ENTIDADES
 
 @Entity(tableName = "platos")
 data class Plato(
@@ -21,8 +20,10 @@ data class Usuario(
     val apellido: String,
     val direccion: String,
     val ciudad: String,
-    val correo: String,
-    val telefono: String
+    @SerializedName("email") val correo: String,
+    val telefono: String,
+    // NUEVO CAMPO:
+    val password: String
 )
 
 @Entity(tableName = "carrito")
@@ -38,7 +39,7 @@ data class DetalleCarrito(
     val cantidad: Int
 )
 
-//DAOs (Data Access Objects)
+// DAOs
 
 @Dao
 interface PlatoDao {
@@ -57,19 +58,27 @@ interface PlatoDao {
 
 @Dao
 interface UsuarioDao {
-    //BUSCA UN USUARIO EN ESPECIFICO POR SU ID (para mantener la sesión activa)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertarUsuario(usuario: Usuario): Long
+
     @Query("SELECT * FROM usuarios WHERE id = :id")
     fun obtenerUsuarioPorId(id: Int): Flow<Usuario?>
 
-    //BUSCA POR CORREO PARA EL LOGIN
     @Query("SELECT * FROM usuarios WHERE correo = :correo LIMIT 1")
     suspend fun buscarPorCorreo(correo: String): Usuario?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertarUsuario(usuario: Usuario): Long // Devuelve el ID insertado
+    @Query("SELECT * FROM usuarios")
+    fun obtenerTodos(): Flow<List<Usuario>>
+
+    @Update
+    suspend fun actualizarUsuario(usuario: Usuario): Int
 
     @Delete
     suspend fun eliminarUsuario(usuario: Usuario)
+
+    @Query("DELETE FROM usuarios WHERE id = :id")
+    suspend fun eliminarUsuarioPorId(id: Int)
 }
 
 @Dao
@@ -91,4 +100,7 @@ interface CarritoDao {
 
     @Query("DELETE FROM carrito")
     suspend fun vaciarCarrito()
+
+    @Query("DELETE FROM carrito WHERE id = :idItem")
+    suspend fun eliminarItemPorId(idItem: Int)
 }
