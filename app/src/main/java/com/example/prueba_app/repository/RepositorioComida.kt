@@ -33,16 +33,56 @@ class RepositorioComida(
     override suspend fun inicializarDatos() {
         try {
             val response = api.getPlatos()
+
             if (response.isSuccessful) {
                 val listaRemota: List<Plato> = response.body() ?: emptyList()
-                if (listaRemota.isNotEmpty()) {
-                    platoDao.insertarPlatos(listaRemota)
+
+                // 1) FILTRAR PLATOS QUE NO QUIERES MOSTRAR
+                val listaSinOcultos = listaRemota.filter { plato ->
+                    // ✅ Aquí ocultas por nombre
+                    plato.nombre != "Tacu Tacu con Lomo"
+                    // Si quieres ocultar más:
+                    // && plato.nombre != "Otro Plato"
+                }
+
+                // 2) (OPCIONAL) AGREGAR PLATOS LOCALES DEFINIDOS EN LA APP
+                val listaFinal = agregarPlatosLocales(listaSinOcultos)
+
+                if (listaFinal.isNotEmpty()) {
+                    // (Opcional) borrar antes para no duplicar
+                    // platoDao.borrarTodos()
+
+                    platoDao.insertarPlatos(listaFinal)
                 }
             }
         } catch (e: Exception) {
-            // Aquí puedes hacer Log.e(...) si quieres
-            // pero no relanzamos para que los tests no fallen por la red
+            // Aquí puedes hacer Log.e("RepositorioComida", "Error inicializarDatos", e)
+            // No relanzamos la excepción para que la app (y los tests) no revienten por fallo de red.
         }
+    }
+
+    /**
+     * Punto único para agregar platos "extras" que NO vienen de la API.
+     * De momento solo devuelve la misma lista, pero puedes editarlo cuando necesites.
+     */
+    private fun agregarPlatosLocales(platos: List<Plato>): List<Plato> {
+        // 📝 EJEMPLO (déjalo comentado hasta que adaptes el constructor de Plato):
+        /*
+        val chaufaEspecial = Plato(
+            id = 999,                    // Usa un id que no exista en la API
+            nombre = "Chaufa Especial",
+            descripcion = "Arroz chaufa con mariscos y pollo",
+            precio = 13500,
+            imagenUrl = "chaufa_especial"
+            // Si tu data class Plato tiene más campos (picor, demoraMin, etc.),
+            // los agregas aquí.
+        )
+
+        return platos + chaufaEspecial
+        */
+
+        // Por defecto no agrega nada
+        return platos
     }
 
     // --- CARRITO (lo dejamos como TODO por ahora) ---

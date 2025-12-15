@@ -10,7 +10,9 @@ data class Plato(
     val nombre: String,
     val descripcion: String,
     val precio: Int,
-    val imagenUrl: String
+    val imagenUrl: String,
+    val picor: Int = 0,        // 0 = nada picante, 5 = muy picante
+    val demoraMin: Int = 15    // minutos estimados de preparación
 )
 
 @Entity(tableName = "usuarios")
