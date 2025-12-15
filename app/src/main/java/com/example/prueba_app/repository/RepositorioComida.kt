@@ -40,7 +40,7 @@ class RepositorioComida(
                 // 1) FILTRAR PLATOS QUE NO QUIERES MOSTRAR
                 val listaSinOcultos = listaRemota.filter { plato ->
                     // ✅ Aquí ocultas por nombre
-                    plato.nombre != "Tacu Tacu con Lomo"
+                    plato.nombre != ""//Tacu Tacu con Lomo
                     // Si quieres ocultar más:
                     // && plato.nombre != "Otro Plato"
                 }
@@ -55,6 +55,8 @@ class RepositorioComida(
                     platoDao.insertarPlatos(listaFinal)
                 }
             }
+
+
         } catch (e: Exception) {
             // Aquí puedes hacer Log.e("RepositorioComida", "Error inicializarDatos", e)
             // No relanzamos la excepción para que la app (y los tests) no revienten por fallo de red.
@@ -67,7 +69,7 @@ class RepositorioComida(
      */
     private fun agregarPlatosLocales(platos: List<Plato>): List<Plato> {
         // 📝 EJEMPLO (déjalo comentado hasta que adaptes el constructor de Plato):
-        /*
+/*
         val chaufaEspecial = Plato(
             id = 999,                    // Usa un id que no exista en la API
             nombre = "Chaufa Especial",
@@ -79,8 +81,8 @@ class RepositorioComida(
         )
 
         return platos + chaufaEspecial
-        */
 
+*/
         // Por defecto no agrega nada
         return platos
     }
