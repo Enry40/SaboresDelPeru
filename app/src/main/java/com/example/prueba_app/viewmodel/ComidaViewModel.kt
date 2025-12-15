@@ -1,19 +1,27 @@
 package com.example.prueba_app.viewmodel
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 import com.example.prueba_app.model.DetalleCarrito
 import com.example.prueba_app.model.Plato
 import com.example.prueba_app.model.Usuario
-import com.example.prueba_app.repository.RepositorioComida
+import com.example.prueba_app.repository.ComidaDataSource
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
-class ComidaViewModel(private val repositorio: RepositorioComida) : ViewModel() {
+class ComidaViewModel(
+    private val repositorio: ComidaDataSource
+) : ViewModel() {
 
-    private val _idUsuarioSesion = MutableStateFlow<Int>(-1)
+    private val _idUsuarioSesion = MutableStateFlow(-1)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val usuarioActivo: StateFlow<Usuario?> = _idUsuarioSesion
@@ -23,27 +31,28 @@ class ComidaViewModel(private val repositorio: RepositorioComida) : ViewModel() 
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private val _consultaBusqueda = MutableStateFlow("")
-    val consultaBusqueda = _consultaBusqueda.asStateFlow()
+    val consultaBusqueda: StateFlow<String> = _consultaBusqueda
 
     private val _buscadorVisible = MutableStateFlow(false)
-    val buscadorVisible = _buscadorVisible.asStateFlow()
+    val buscadorVisible: StateFlow<Boolean> = _buscadorVisible
 
     val listaPlatos: StateFlow<List<Plato>> = repositorio.platos
         .combine(_consultaBusqueda) { platos, query ->
-            if (query.isEmpty()) platos else platos.filter { it.nombre.contains(query, ignoreCase = true) }
+            if (query.isEmpty()) platos
+            else platos.filter { it.nombre.contains(query, ignoreCase = true) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val carrito: StateFlow<List<DetalleCarrito>> = repositorio.carrito
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val totalCarrito: StateFlow<Int> = carrito.map { items ->
-        items.sumOf { it.plato.precio * it.cantidad }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+    val totalCarrito: StateFlow<Int> = carrito
+        .map { items -> items.sumOf { it.plato.precio * it.cantidad } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    val cantidadProductos: StateFlow<Int> = carrito.map { items ->
-        items.sumOf { it.cantidad }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+    val cantidadProductos: StateFlow<Int> = carrito
+        .map { items -> items.sumOf { it.cantidad } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     init {
         viewModelScope.launch {
@@ -51,8 +60,12 @@ class ComidaViewModel(private val repositorio: RepositorioComida) : ViewModel() 
         }
     }
 
-    // Se agregs el password
-    fun iniciarSesion(correo: String, contrasena: String, onError: () -> Unit, onSuccess: () -> Unit) {
+    fun iniciarSesion(
+        correo: String,
+        contrasena: String,
+        onError: () -> Unit,
+        onSuccess: () -> Unit
+    ) {
         viewModelScope.launch {
             val usuario = repositorio.login(correo, contrasena)
             if (usuario != null) {
@@ -98,7 +111,11 @@ class ComidaViewModel(private val repositorio: RepositorioComida) : ViewModel() 
         _buscadorVisible.value = mostrar
     }
 
-    fun agregarAlCarrito(platoId: Int, onNoRegistrado: () -> Unit, onExito: () -> Unit) {
+    fun agregarAlCarrito(
+        platoId: Int,
+        onNoRegistrado: () -> Unit,
+        onExito: () -> Unit
+    ) {
         val usuario = usuarioActivo.value
         if (usuario == null) {
             onNoRegistrado()
@@ -115,15 +132,5 @@ class ComidaViewModel(private val repositorio: RepositorioComida) : ViewModel() 
         viewModelScope.launch {
             repositorio.reducirCantidadOEliminar(detalle, usuario?.id ?: -1)
         }
-    }
-}
-
-class ComidaViewModelFactory(private val repositorio: RepositorioComida) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(ComidaViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return ComidaViewModel(repositorio) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
